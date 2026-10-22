@@ -1,0 +1,104 @@
+### Loading in Data and Packages
+```{r}
+#| output: false
+# Loading in the libraries
+library(tidyverse)
+library(here)
+library(sf)
+library(tmap)
+
+# Loading in the data
+ejscreen <- st_read(
+  '/Users/cuvlin/Documents/MEDS/eds223/eds223-hw2/data/data 2/ejscreen/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb'
+)
+
+ej_la <- ejscreen |>
+  filter(CNTY_NAME == "Los Angeles County") |>
+  filter(ST_ABBREV == "CA") |>
+  st_make_valid()
+
+mapping_inqeuality_LA <- st_read(
+  '/Users/cuvlin/Documents/MEDS/eds223/eds223-hw2/data/data 2/mapping-inequality/mapping-inequality-los-angeles.json'
+) |>
+  st_make_valid()
+
+crash_reports <- read_csv(
+  '/Users/cuvlin/Documents/MEDS/eds223/eds223-hw2/data/data 2/SWITRS_LA/Crashes.csv'
+) |>
+  drop_na(POINT_X, POINT_Y) |>
+  st_as_sf(coords = c("POINT_X", "POINT_Y"), crs = 4236)
+# sf would not read it in raw so I had to read it as csv and then convert it to sf dataframe
+```
+
+Match CRS for all of the datasets:
+```{r}
+#| output: false
+# Set one crs as the desired crs and make it universal
+crs <- st_crs(crash_reports)
+ej_la <- st_transform(ej_la, crs = crs)
+mapping_inqeuality_LA <- st_transform(mapping_inqeuality_LA, crs = crs)
+
+# Check to see if all the CRS's match
+if (
+  st_crs(ej_la) == st_crs(crash_reports) &&
+    st_crs(ej_la) == st_crs(mapping_inqeuality_LA)
+) {
+  print('All CRS match :)')
+} else {
+  print('CRS dont match :(')
+}
+```
+
+### Part 1: Legacy of redlining in current environmental (in)justice:
+
+#### Task 1: Create a map of historical redlining neighborhoods
+
+```{r}
+# Define color palette for redlining districts (4 categories)
+redlining_colors <- c('green', 'blue', 'yellow', 'red')
+
+# Plot grades and make it look good
+tm_shape(mapping_inqeuality_LA) +
+  tm_polygons(
+    fill = 'grade',
+    title = 'HOLC Grade',
+    palette = redlining_colors,
+    alpha = 0.5
+  ) +
+  tm_borders() +
+  tm_basemap('OpenStreetMap') +
+  tm_title('HOLC Redlining in Los Angeles County')
+```
+
+#### Task 2: Create a table with summary data 
+
+```{r}
+# Join the HOLC dataset with the EJSCreen data
+ej_holc <- st_join(ej_la, mapping_inqeuality_LA) |> st_drop_geometry()
+
+# Group by HOLC grade and find % of census blocks within
+holc_grouped <- ej_holc |>
+  group_by(grade) |>
+  count() |>
+  mutate(percent_census = n / (dim(ej_holc)[1]))
+print(holc_grouped)
+```
+##### Percent of census blocks in each HOLC Grade
+
+| HOLC Grade | # of census blocks in this grade | % of census blocks in this grade |
+| --- | --- | --- |
+| A | 449 | 5% |
+| B | 1239 | 13.8% |
+| C | 3058 | 34% |
+| D | 1346 | 15% |
+| Ungraded | 2896 | 32.2% |
+
+#### Task 3: Create two viusualizations summarzing current conditions within HOLC grades:
+
+```{r}
+
+```
+
+#### Task 4:
+
+
