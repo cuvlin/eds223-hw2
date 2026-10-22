@@ -96,9 +96,49 @@ print(holc_grouped)
 #### Task 3: Create two viusualizations summarzing current conditions within HOLC grades:
 
 ```{r}
+# Wrangle the data we want & summarize by HOLC grade groups
+conditions_la <- ej_holc |>
+  select(grade, LOWINCPCT, PM25, P_LIFEEXPPCT) |>
+  summarise(
+    across(c(LOWINCPCT, PM25, P_LIFEEXPPCT), ~ mean(.x, na.rm = TRUE)),
+    .by = grade
+  ) |>
+  mutate(LOWINCPCT = LOWINCPCT * 100) |>
+  arrange(grade)
+```
 
+Visualize the data:
+
+```{r}
+# Bar plot of PM2.5 per HOLC grade
+conditions_la |>
+  ggplot(
+    aes(x = grade, y = PM25)
+  ) +
+  geom_col(fill = "lightblue") +
+  labs(
+    title = "Average Particulate Matter 2.5 (PM2.5) per HOLC Grade",
+    x = "HOLC Grade",
+    y = "PM 2.5 Value"
+  ) +
+  geom_hline(yintercept = 35, color = "red")
+```
+
+```{r}
+# Bar plot of % Low Income per HOLC grade
+conditions_la |>
+  ggplot(
+    aes(x = grade, y = LOWINCPCT)
+  ) +
+  geom_col(fill = "lightgreen") +
+  labs(
+    title = "Average Percent Low Income per HOLC Grade",
+    x = "HOLC Grade",
+    y = "% Low Income"
+  )
 ```
 
 #### Task 4:
+Interpretation of out data analysis and visualization:
 
-
+I decided to visualize the relative air quality (PM 2.5) and average percentage of low income homes within each HOLC grade. If we take a look at the air quality graph, it is clear that there is not too big of a discrepancy between the HOLC grades. This make sense-- a lot of the HOLC regions are really close to eachother and LA is generally polluted badly when it comes to air quality. However, the real narrtive kicks in when we look at the average percent of low income homes within each HOLC grade. Historically speaking, redlining happend within the "D" category, and as we see in the second figure, the "D" grade has by far the highest average percent of low income homes. This makes sense, as historcally marginalized communities are disproportianately pushed towards reslined neighborhoods, where there are less opportunities to improve their income status. There is a clear "staircase" relationship between income and HOLC grades. AS we move from A -> D (increasing redlining) the percentage of low income homes dramatically increases at each step.
