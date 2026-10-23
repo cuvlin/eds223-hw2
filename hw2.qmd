@@ -54,6 +54,7 @@ if (
 #### Task 1: Create a map of historical redlining neighborhoods
 
 ```{r}
+#| results: hide
 # Define color palette for redlining districts (4 categories)
 redlining_colors <- c('green', 'blue', 'yellow', 'red')
 
@@ -73,6 +74,7 @@ tm_shape(mapping_inqeuality_LA) +
 #### Task 2: Create a table with summary data 
 
 ```{r}
+#| output: false
 # Join the HOLC dataset with the EJSCreen data
 ej_holc <- st_join(ej_la, mapping_inqeuality_LA) |> st_drop_geometry()
 
@@ -83,6 +85,7 @@ holc_grouped <- ej_holc |>
   mutate(percent_census = n / (dim(ej_holc)[1]))
 print(holc_grouped)
 ```
+
 ##### Percent of census blocks in each HOLC Grade
 
 | HOLC Grade | # of census blocks in this grade | % of census blocks in this grade |
@@ -96,6 +99,7 @@ print(holc_grouped)
 #### Task 3: Create two viusualizations summarzing current conditions within HOLC grades:
 
 ```{r}
+#| output: false
 # Wrangle the data we want & summarize by HOLC grade groups
 conditions_la <- ej_holc |>
   select(grade, LOWINCPCT, PM25, P_LIFEEXPPCT) |>
@@ -147,6 +151,7 @@ I decided to visualize the relative air quality (PM 2.5) and average percentage 
 ### Part 2: Legacy of redlining in pedestrian and bike accidents
 
 ```{r}
+#| output: false
 # Subset original dataset to only reports where there was a pedestrian acciden or bicycyle accident
 bike_ped_accidents <- crash_reports |>
   select(c(
@@ -159,8 +164,6 @@ bike_ped_accidents <- crash_reports |>
   )) |>
   st_as_sf()
 
-# Find Total amount of crashes reported
-n_crashes <- length(bike_ped_accidents$COLLISION_DATE)
 
 # Replace the value of 'Y' with 1 (an integer)
 bike_ped_accidents$PEDESTRIAN_ACCIDENT[
@@ -179,22 +182,72 @@ bike_ped_accidents$COUNT_BICYCLIST_KILLED[
 ] <- 1
 
 # Turn each column into integers
-bike_ped_accidents$PEDESTRIAN_ACCIDENT <- as.integer(
+bike_ped_accidents$PEDESTRIAN_ACCIDENT <- as.double(
   bike_ped_accidents$PEDESTRIAN_ACCIDENT
 )
-bike_ped_accidents$BICYCLE_ACCIDENT <- as.integer(
+bike_ped_accidents$BICYCLE_ACCIDENT <- as.double(
   bike_ped_accidents$BICYCLE_ACCIDENT
 )
+
+# Turn all na values to 0
+bike_ped_accidents[is.na(bike_ped_accidents)] <- 0
 
 # Rename columns for simplicity
 colnames <- c('date', 'ped', 'bike', 'ped_killed', 'bike_killed', 'geometry')
 colnames(bike_ped_accidents) <- colnames
 
+# Find Total amount of crashes, total amount of bike crashes, total amount of pedestrian crashes
+n_crashes <- length(bike_ped_accidents$date)
+n_bike <- sum(bike_ped_accidents$bike == 1)
+n_ped <- sum(bike_ped_accidents$ped == 1)
+
 # Combine accident data with HOLC data and groupy by HOLC Grade to get sum of bike and pedestrian accidents
 crash_HOLC <- st_join(bike_ped_accidents, mapping_inqeuality_LA) |>
   st_drop_geometry() |>
-  select(c('date', 'ped', 'bike', 'ped_killed', 'bike_killed', 'grade'))
+  select(c('ped', 'bike', 'ped_killed', 'bike_killed', 'grade')) |>
+  summarize(
+    across(c('ped', 'bike', 'ped_killed', 'bike_killed'), sum),
+    .by = grade
+  )
 
-#group_by('grade') |>
-#sum()
+# Replace NA with 'No Grade'
+crash_HOLC[is.na(crash_HOLC)] <- 'No Grade'
+
+# Turn total number of crashes into percentages
+crash_HOLC$ped <- (crash_HOLC$ped / n_crashes) * 100
+crash_HOLC$bike <- (crash_HOLC$bike / n_crashes) * 100
+crash_HOLC$bike_killed <- (crash_HOLC$bike_killed / n_bike) * 100
+crash_HOLC$ped_killed <- (crash_HOLC$ped_killed / n_ped) * 100
+
+# Pivot longer to plot all at once
+crash_HOLC_long <- crash_HOLC |>
+  pivot_longer(
+    cols = c('ped', 'bike', 'ped_killed', 'bike_killed'),
+    names_to = 'pct_type',
+    values_to = 'pct'
+  )
+```
+
+```{r}
+#| results: hide
+# Plot using bar graph
+crash_HOLC_long |>
+  ggplot(
+    aes(x = grade, y = pct, fill = pct_type)
+  ) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(
+    title = 'Visualized legacy of redlining in pedestrian and bike accidents',
+    x = "HOLC Grade",
+    y = "Percent",
+    fill = "Crash Incident Rates"
+  ) +
+  scale_fill_discrete(
+    labels = c(
+      "Bike crash rate",
+      "Bike crash fatality rate",
+      "Pedestrian crash rate",
+      "Pedestrian crash fatality rate"
+    )
+  )
 ```
