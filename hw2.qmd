@@ -142,3 +142,59 @@ conditions_la |>
 Interpretation of out data analysis and visualization:
 
 I decided to visualize the relative air quality (PM 2.5) and average percentage of low income homes within each HOLC grade. If we take a look at the air quality graph, it is clear that there is not too big of a discrepancy between the HOLC grades. This make sense-- a lot of the HOLC regions are really close to eachother and LA is generally polluted badly when it comes to air quality. However, the real narrtive kicks in when we look at the average percent of low income homes within each HOLC grade. Historically speaking, redlining happend within the "D" category, and as we see in the second figure, the "D" grade has by far the highest average percent of low income homes. This makes sense, as historcally marginalized communities are disproportianately pushed towards reslined neighborhoods, where there are less opportunities to improve their income status. There is a clear "staircase" relationship between income and HOLC grades. AS we move from A -> D (increasing redlining) the percentage of low income homes dramatically increases at each step.
+
+
+### Part 2: Legacy of redlining in pedestrian and bike accidents
+
+```{r}
+# Subset original dataset to only reports where there was a pedestrian acciden or bicycyle accident
+bike_ped_accidents <- crash_reports |>
+  select(c(
+    'COLLISION_DATE',
+    'PEDESTRIAN_ACCIDENT',
+    'BICYCLE_ACCIDENT',
+    'COUNT_PED_KILLED',
+    'COUNT_BICYCLIST_KILLED',
+    'geometry'
+  )) |>
+  st_as_sf()
+
+# Find Total amount of crashes reported
+n_crashes <- length(bike_ped_accidents$COLLISION_DATE)
+
+# Replace the value of 'Y' with 1 (an integer)
+bike_ped_accidents$PEDESTRIAN_ACCIDENT[
+  bike_ped_accidents$PEDESTRIAN_ACCIDENT == 'Y'
+] <- 1
+bike_ped_accidents$BICYCLE_ACCIDENT[
+  bike_ped_accidents$BICYCLE_ACCIDENT == 'Y'
+] <- 1
+
+# Bake count ped killed column binaary. 0 if no deaths, 1 if there is a death.
+bike_ped_accidents$COUNT_PED_KILLED[
+  bike_ped_accidents$COUNT_PED_KILLED > 1
+] <- 1
+bike_ped_accidents$COUNT_BICYCLIST_KILLED[
+  bike_ped_accidents$COUNT_BICYCLIST_KILLED > 1
+] <- 1
+
+# Turn each column into integers
+bike_ped_accidents$PEDESTRIAN_ACCIDENT <- as.integer(
+  bike_ped_accidents$PEDESTRIAN_ACCIDENT
+)
+bike_ped_accidents$BICYCLE_ACCIDENT <- as.integer(
+  bike_ped_accidents$BICYCLE_ACCIDENT
+)
+
+# Rename columns for simplicity
+colnames <- c('date', 'ped', 'bike', 'ped_killed', 'bike_killed', 'geometry')
+colnames(bike_ped_accidents) <- colnames
+
+# Combine accident data with HOLC data and groupy by HOLC Grade to get sum of bike and pedestrian accidents
+crash_HOLC <- st_join(bike_ped_accidents, mapping_inqeuality_LA) |>
+  st_drop_geometry() |>
+  select(c('date', 'ped', 'bike', 'ped_killed', 'bike_killed', 'grade'))
+
+#group_by('grade') |>
+#sum()
+```
